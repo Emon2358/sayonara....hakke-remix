@@ -1,0 +1,46 @@
+name: Convert KOE to WAV and Release
+
+# このワークフローを手動で実行できるようにする (Actionsタブから)
+on:
+  workflow_dispatch:
+
+jobs:
+  build-and-release:
+    # 実行ファイル(.exe)のため、Windowsランナーが必須 
+    runs-on: windows-latest
+
+    permissions:
+      contents: write # リリースを作成するために必要
+
+    steps:
+      # 1. リポジトリのコードをチェックアウト (koeunpac.exe, process_koe.py を含める)
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Python環境をセットアップ
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10' # 任意のバージョン
+
+      # 3. Pythonの依存ライブラリをインストール
+      - name: Install Python dependencies
+        run: pip install requests beautifulsoup4
+
+      # 4. Pythonスクリプトを実行 (ダウンロードと変換)
+      - name: Run KOE processing script
+        run: python ./process_koe.py
+
+      # 5. 変換されたWAVファイルをリリースとしてアップロード
+      - name: Create GitHub Release with WAV files
+        uses: softprops/action-gh-release@v1
+        with:
+          # "audio-release-YYYY-MM-DD-HH-MM-SS" のようなタグ名を作成
+          tag_name: "audio-release-${{ env.TIMESTAMP }}"
+          # "wav_files" ディレクトリ内の全.wavファイルをアップロード
+          files: wav_files/*.wav
+        env:
+          # 実行時のタイムスタンプを環境変数に設定
+          TIMESTAMP: $(Get-Date -Format 'yyyy-MM-dd-HH-mm-ss')
+          # 認証用のトークン
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
