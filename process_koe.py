@@ -14,7 +14,7 @@ DOWNLOAD_BASE_URL = "https://archive.org"
 # 一時作業ディレクトリ
 KOE_DIR = "koe_files"
 WAV_DIR = "wav_files"
-# 実行ファイルがWAVを出力すると推測されるディレクトリ 
+# 実行ファイルがWAVを出力すると推測されるディレクトリ
 EXTRACT_DIR = "koewav" 
 # 実行ファイル名
 UNPACKER_EXE = "koeunpac.exe"
@@ -44,7 +44,7 @@ try:
 
     if not koe_links:
         print("No .KOE files found on the page.")
-        exit(0)
+        exit(0) # エラーではなく正常終了
 
     print(f"Found {len(koe_links)} .KOE files. Downloading...")
 
@@ -63,17 +63,36 @@ except requests.RequestException as e:
     print(f"Error during scraping or downloading: {e}")
     exit(1)
 
-# --- 3. .KOEファイルから.WAVへの変換 ---
+# --- 3. .KOEファイルから.WAVへの変換 (★エラー修正箇所) ---
 print(f"Running {UNPACKER_EXE} on directory {KOE_DIR}...")
 try:
-    # 実行ファイルに .KOEファイル群があるディレクトリを渡す
-    # プロセスはカレントディレクトリで実行される
-    subprocess.run([f"./{UNPACKER_EXE}", KOE_DIR], check=True, shell=True)
+    # 修正点:
+    # 1. shell=True を削除し、Pythonにプロセス起動を直接管理させます。
+    # 2. 実行ファイル名と引数をリスト形式 [UNPACKER_EXE, KOE_DIR] で渡します。
+    #    (UNPACKER_EXE は "koeunpac.exe" という文字列です)
+    
+    print(f"Executing: {UNPACKER_EXE} {KOE_DIR}")
+    
+    # Pythonが "koeunpac.exe" をカレントディレクトリから探し、
+    # "koe_files" を引数として実行します。
+    subprocess.run([UNPACKER_EXE, KOE_DIR], check=True) 
+
 except subprocess.CalledProcessError as e:
+    # 実行ファイルがエラー(0以外)を返した場合
     print(f"Error running {UNPACKER_EXE}: {e}")
+    print(f"Return code: {e.returncode}")
+    # stdout/stderrはキャプチャ指定していない場合 None になりますが、念のため
+    print(f"Stdout (if any): {e.stdout}") 
+    print(f"Stderr (if any): {e.stderr}")
     exit(1)
 except FileNotFoundError:
+    # "koeunpac.exe" が見つからなかった場合
     print(f"Error: {UNPACKER_EXE} not found in repository root.")
+    print("Please ensure koeunpac.exe is in the root directory.")
+    exit(1)
+except Exception as e:
+    # その他の予期せぬエラー
+    print(f"An unexpected error occurred during subprocess execution: {e}")
     exit(1)
 
 # --- 4. .WAVファイルの移動 ---
@@ -91,5 +110,9 @@ for filename in os.listdir(EXTRACT_DIR):
         shutil.move(src_path, dest_path)
         wav_files_found += 1
 
-print(f"Successfully moved {wav_files_found} .WAV files.")
+if wav_files_found == 0:
+    print(f"Warning: No .WAV files were found in {EXTRACT_DIR}.")
+else:
+    print(f"Successfully moved {wav_files_found} .WAV files.")
+
 print("Process complete.")
